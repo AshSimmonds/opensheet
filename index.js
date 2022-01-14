@@ -35,7 +35,8 @@ app.use(
 app.use(require("cors")());
 
 app.get("/", async (req, res) => {
-  res.redirect("https://github.com/benborgers/opensheet#readme");
+  // res.redirect("https://github.com/benborgers/opensheet#readme");
+  res.redirect("1jYo7FZJRXW_qghHAEnmFUws6b2yIGS-lZCnRGkxLUCY/1");
 });
 
 app.get("/:id/:sheet", async (req, res) => {
@@ -45,7 +46,7 @@ app.get("/:id/:sheet", async (req, res) => {
   sheet = sheet.replace(/\+/g, " ");
 
   const cacheKey = `${id}--${sheet}`;
-  if (await redis.exists(cacheKey)) {
+  if (redis.exists(cacheKey)) {
     return res.json(JSON.parse(await redis.get(cacheKey)));
   }
 
@@ -73,35 +74,36 @@ app.get("/:id/:sheet", async (req, res) => {
     sheet = data.sheets[sheetIndex].properties.title;
   }
 
-  sheets.spreadsheets.values.get(
-    {
-      spreadsheetId: id,
-      range: sheet,
-    },
-    async (error, result) => {
-      if (error) {
-        return res.json({ error: error.response.data.error.message });
-      }
 
-      const rows = [];
+  await sheets.spreadsheets.values.get(
+      {
+        spreadsheetId: id,
+        range: sheet,
+      },
+      async (error, result) => {
+        if (error) {
+          return res.json({error: error.response.data.error.message});
+        }
 
-      const rawRows = result.data.values || [];
-      const headers = rawRows.shift();
+        const rows = [];
 
-      rawRows.forEach((row) => {
-        const rowData = {};
-        row.forEach((item, index) => {
-          rowData[headers[index]] = item;
+        const rawRows = result.data.values || [];
+        const headers = rawRows.shift();
+
+        rawRows.forEach((row) => {
+          const rowData = {};
+          row.forEach((item, index) => {
+            rowData[headers[index]] = item;
+          });
+          rows.push(rowData);
         });
-        rows.push(rowData);
-      });
 
-      await redis.set(cacheKey, JSON.stringify(rows), {
-        EX: 30, // Cache for 30 seconds
-      });
+        await redis.set(cacheKey, JSON.stringify(rows), {
+          EX: 30, // Cache for 30 seconds
+        });
 
-      return res.json(rows);
-    }
+        return res.json(rows);
+      }
   );
 });
 
